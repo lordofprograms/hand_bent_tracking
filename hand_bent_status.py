@@ -8,7 +8,7 @@ wCam, hCam = 640, 480
 cap = cv2.VideoCapture(0)
 pTime = 0
 
-detector = htm.HandDetector(detectionCon=0.75, trackCon=0.75)
+detector = htm.HandDetector(detectionCon=0.7, trackCon=0.7)
 
 # TODO add list with 5 latest or one value, if next value is bigger or smaller for 7-10 update value
 # TODO also make this for ref_points
@@ -20,7 +20,7 @@ class HandBentStatus:
         self.maxVal = 100
 
         # if needed can change middle to little finger base, 9 to 17
-        self.thumb_finish_fb = 9
+        self.thumb_finish_fb = 13
         self.min_tip_dict = {4: 0.1, 8: 1.7, 12: 1.5, 16: 1.7, 20: 2}
         self.max_tip_dict = {4: 4}
 
@@ -33,12 +33,21 @@ class HandBentStatus:
 
     def selected_tip_demo(self, lmList, tip_id: int = 8):
         # tip_id = 8
-        x1, y1 = lmList[tip_id][1], lmList[tip_id][2]
+        if tip_id != -1:
+            x1, y1 = lmList[tip_id][1], lmList[tip_id][2]
+        else:
+            x1, y1 = lmList[4][1], lmList[4][2]
+
         if tip_id != 4:
             x2, y2 = lmList[tip_id - 3][1], lmList[1][2]
+        elif tip_id == -1:
+            x2, y2 = lmList[13][1], lmList[13][2]
         else:
             x2, y2 = lmList[self.thumb_finish_fb][1], lmList[self.thumb_finish_fb][2]
         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+
+        if tip_id == -1:
+            tip_id = 4
 
         cv2.circle(img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
         cv2.circle(img, (x2, y2), 15, (255, 0, 255), cv2.FILLED)
@@ -78,7 +87,7 @@ class HandBentStatus:
         volBar = np.interp(length, [rel_hand_min_range, rel_hand_max_range], [400, 150])
         # volPer = np.interp(length, [rel_hand_min_range, rel_hand_max_range], [0, 100])
         volPer = vol
-        print("experiment: ", int(length), vol, lmList[tip_id][3])
+        # print("experiment: ", int(length), vol, lmList[tip_id][3])
 
         if length < 50:
             cv2.circle(img, (cx, cy), 15, (0, 255, 0), cv2.FILLED)
@@ -88,28 +97,34 @@ class HandBentStatus:
         cv2.putText(img, f'{int(volPer)} %', (40, 450), cv2.FONT_HERSHEY_COMPLEX,
                     1, (255, 0, 0), 3)
 
-    def fingers_bent_percent(self, lm_list) -> list:
+    def fingers_bent_percent(self, lm_list):
         # TODO add thumb drive
         ref_point = abs(lm_list[2][2] - lm_list[1][2])
         # print(f"test point finger base = {abs(lmList[5][1] - lmList[17][1])} and palm base test = "
         #       f"{abs(lmList[17][2] - lmList[0][2])}")
         # TODO maybe do something when we show front side of the palm
         new_prev_diff = abs(ref_point - self.prev_ref_point)
-        if new_prev_diff > 30:
+        if new_prev_diff > 15:
             print(f"ref point = {ref_point}, prev ref point was {self.prev_ref_point}, |diff| = {new_prev_diff}")
             # TODO test it more to make it more stable
             self.prev_ref_point = ref_point
-            # print("ref point size = ", ref_point)
+            print("ref point size = ", ref_point)
         else:
             ref_point = self.prev_ref_point
 
         fingers_percent = []
+        # send_flag = False
         tip_id_list = [4, 8, 12, 16, 20]
         for i, tip_id in enumerate(tip_id_list):
+            # if tip_id != -1:
+            #     x1, y1 = lm_list[tip_id][1], lm_list[tip_id][2]
+            # else:
             x1, y1 = lm_list[tip_id][1], lm_list[tip_id][2]
 
             if tip_id != 4:
                 x2, y2 = lm_list[tip_id - 3][1], lm_list[1][2]
+            # elif tip_id == -1:
+            #     x2, y2 = lm_list[5][1], lm_list[5][2]
             else:
                 x2, y2 = lm_list[self.thumb_finish_fb][1], lm_list[self.thumb_finish_fb][2]
 
@@ -125,10 +140,11 @@ class HandBentStatus:
             bent_percent = round(100 - open_percent)
 
             # TODO test it
-            if abs(bent_percent - self.prev_percent_arr[i]) > 5:
+            if abs(bent_percent - self.prev_percent_arr[i]) > 10:
                 print(f"{self.name_mappings.get(i)}({i}) bent % ={bent_percent}, prev % was {self.prev_percent_arr[i]},"
                       f"diff = {abs(bent_percent - self.prev_percent_arr[i])}")
                 self.prev_percent_arr[i] = bent_percent
+                # send_flag = True
             else:
                 bent_percent = self.prev_percent_arr[i]
 
@@ -138,15 +154,25 @@ class HandBentStatus:
 
 if __name__ == '__main__':
     finger_regressor = HandBentStatus()
+
+    # i = 0
     while True:
         success, img = cap.read()
+
         img = detector.findHands(img)
         lmList = detector.findPosition(img, draw=False)
         if len(lmList) != 0:
+        # if len(lmList) != 0 and i % 15 == 0:
+            # print(i)
             tip_ids = [4, 8, 12, 16, 20]
-            # finger_regressor.selected_tip_demo(lmList, 4)
-            fingers_stats = finger_regressor.fingers_bent_percent(lmList)
-            print(fingers_stats)
+            finger_regressor.selected_tip_demo(lmList, -1)
+            # fingers_stats = finger_regressor.fingers_bent_percent(lmList)
+            # print(fingers_stats)
+            # if send_flag:
+            #     print(fingers_stats)
+            # i = 1
+        # else:
+        #     print("ignore")
 
         cTime = time.time()
         fps = 1 / (cTime - pTime)
@@ -156,3 +182,4 @@ if __name__ == '__main__':
 
         cv2.imshow("Img", img)
         cv2.waitKey(1)
+        # i += 1

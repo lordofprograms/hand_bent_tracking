@@ -2,6 +2,7 @@ import math
 import cv2
 import mediapipe as mp
 import time
+import numpy as np
 
 
 class HandDetector:
@@ -31,7 +32,6 @@ class HandDetector:
         return img
 
     def findPosition(self, img, handNo=0, draw=True):
-
         lmlist = []
         if self.results.multi_hand_landmarks:
             myHand = self.results.multi_hand_landmarks[handNo]
