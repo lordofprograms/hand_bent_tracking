@@ -46,7 +46,7 @@ class HandBentStatus:
 
         self.idx += 1
         if len(lm_list) != 0 and (return_step == 0 or self.idx % return_step == 0):
-            fingers_stats = finger_regressor.fingers_bent_percent(lm_list)
+            fingers_stats = self.fingers_bent_percent(lm_list)
             # cv2.putText(img, f"{fingers_stats}", (640, 640), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 3)
             self.idx = 1
             fingers_stats.reverse()
