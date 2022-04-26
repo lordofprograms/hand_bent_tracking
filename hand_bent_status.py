@@ -8,7 +8,7 @@ wCam, hCam = 640, 480
 cap = cv2.VideoCapture(0)
 pTime = 0
 
-detector = htm.HandDetector(detectionCon=0.75, trackCon=0.75)
+detector = htm.HandDetector(detection_conf=0.7, track_conf=0.7)
 
 # TODO add list with 5 latest or one value, if next value is bigger or smaller for 7-10 update value
 # TODO also make this for ref_points
@@ -103,7 +103,7 @@ class HandBentStatus:
         else:
             ref_point = self.prev_ref_point
 
-        fingers_percent = []
+        fingers_percent = [0]
         tip_id_list = [4, 8, 12, 16, 20]
         for i, tip_id in enumerate(tip_id_list):
             x1, y1 = lm_list[tip_id][1], lm_list[tip_id][2]
@@ -138,18 +138,20 @@ class HandBentStatus:
 
 if __name__ == '__main__':
     finger_regressor = HandBentStatus()
-    fp = 0
     while True:
         success, img = cap.read()
-        img = detector.findHands(img)
+        img = detector.find_hands(img, draw=True)
+        lmList = detector.find_position(img, draw=False)
 
-        lmList = detector.findPosition(img, draw=False)
-
-        if len(lmList) != 0:
+        i = 0
+        # if len(lmList) != 0:
+        if len(lmList) != 0 and i % 15 == 0:
             tip_ids = [4, 8, 12, 16, 20]
             # finger_regressor.selected_tip_demo(lmList, 4)
             fingers_stats = finger_regressor.fingers_bent_percent(lmList)
-            # print(fingers_stats)
+            print(fingers_stats)
+            cv2.putText(img, f"{fingers_stats}", (640, 640), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 3)
+            i = 1
 
         cTime = time.time()
         fps = 1 / (cTime - pTime)

@@ -1,22 +1,22 @@
 import math
+import time
+
 import cv2
 import mediapipe as mp
-import time
-import one_euro_filter
-import numpy as np
-import kalman
 from mediapipe.framework.formats import landmark_pb2
 
+import kalman
+
+
 class HandDetector:
-    def __init__(self, mode=False, maxHands=1, modelComplexity=1, detectionCon=0.7, trackCon=0.5):
+    def __init__(self, mode=False, max_hands=1, detection_conf=0.7, track_conf=0.5):
         self.mode = mode
-        self.maxHands = maxHands
-        self.detectionCon = detectionCon
-        self.trackCon = trackCon
-        self.modelComplex = modelComplexity
-        self.mpHands = mp.solutions.hands
-        self.hands = self.mpHands.Hands(self.mode, self.maxHands, self.modelComplex, self.detectionCon, self.trackCon)
-        self.mpDraw = mp.solutions.drawing_utils
+        self.max_hands = max_hands
+        self.detection_conf = detection_conf
+        self.track_conf = track_conf
+        self.mp_hands = mp.solutions.hands
+        self.hands = self.mp_hands.Hands(self.mode, self.max_hands, self.detection_conf, self.track_conf)
+        self.mp_draw = mp.solutions.drawing_utils
 
         self.tip_ids = [4, 8, 12, 16, 20]
         self.name_mappings = {0: "thumb", 1: "index", 2: "middle", 3: "ring", 4: "little"}
@@ -25,10 +25,10 @@ class HandDetector:
 
         self.one_euro_filter_x = []
         self.one_euro_filter_y = []
-        self.one_euro_filter_z = []
+        # self.one_euro_filter_z = []
         self.fps = 0
 
-    def filter(self, landmarks, fps):
+    def filter(self, landmarks):
         filtered_landmarks = []
         for i, landmark in enumerate(landmarks.landmark):
             # x = self.one_euro_filter_x[i](fps, landmark.x)
@@ -40,18 +40,15 @@ class HandDetector:
             x = self.one_euro_filter_x[i].get_results()[0]
             self.one_euro_filter_y[i].update([landmark.y])
             y = self.one_euro_filter_y[i].get_results()[0]
-            #print(x)
-            self.one_euro_filter_z[i].update([landmark.z])
-            z= self.one_euro_filter_z[i].get_results()[0]
+            # print(x)
+            # self.one_euro_filter_z[i].update([landmark.z])
+            # z = self.one_euro_filter_z[i].get_results()[0]
             # flm = landmark_pb2.NormalizedLandmark(x=x, y=y, z=z)
-            filtered_landmarks.append(landmark_pb2.NormalizedLandmark(x=x, y=y, z=z))
-        filtered_landmark_list = landmark_pb2.NormalizedLandmarkList(
-            landmark=filtered_landmarks
-        )
+            filtered_landmarks.append(landmark_pb2.NormalizedLandmark(x=x, y=y))
+        filtered_landmark_list = landmark_pb2.NormalizedLandmarkList(landmark=filtered_landmarks)
         return filtered_landmark_list
 
-
-    def findHands(self, img, draw=True):
+    def find_hands(self, img, draw=True):
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.hands.process(imgRGB)
         # print(results.multi_hand_landmarks)
@@ -76,24 +73,24 @@ class HandDetector:
                             #     one_euro_filter.MeanFilter(0, handLms.landmark[i].y))
                             # self.one_euro_filter_z.append(
                             #     one_euro_filter.MeanFilter(0, handLms.landmark[i].z))
-                            self.one_euro_filter_x.append(
-                                kalman.Stabilizer([handLms.landmark[i].x], 1))
-                            self.one_euro_filter_y.append(
-                                kalman.Stabilizer([handLms.landmark[i].y], 1))
-                            self.one_euro_filter_z.append(
-                                kalman.Stabilizer([handLms.landmark[i].z], 1))
+                            self.one_euro_filter_x.append(kalman.Stabilizer([handLms.landmark[i].x], 1))
+                            self.one_euro_filter_y.append(kalman.Stabilizer([handLms.landmark[i].y], 1))
+                            # self.one_euro_filter_z.append(kalman.Stabilizer([handLms.landmark[i].z], 1))
+
+
                     else:
                         self.fps = self.fps + 1
                         # # print(f'fps: {self.fps}')
                         # print(handLms.landmark[0].x)
-                        handLms = self.filter(handLms, self.fps)
+                        handLms = self.filter(handLms)
                         # print(f'after:{handLms.landmark[0].x}')
                         # print(f'after 1:{handLms.landmark[1].x}')
-                    self.mpDraw.draw_landmarks(img, handLms, self.mpHands.HAND_CONNECTIONS)
+
+                    self.mp_draw.draw_landmarks(img, handLms, self.mp_hands.HAND_CONNECTIONS)
 
         return img
 
-    def findPosition(self, img, handNo=0, draw=True):
+    def find_position(self, img, handNo=0, draw=True):
 
         lmlist = []
         if self.results.multi_hand_landmarks:
@@ -102,7 +99,7 @@ class HandDetector:
                 h, w, c = img.shape
                 cx, cy = int(lm.x * w), int(lm.y * h)
                 # print("Z axis = ", lm.z, int(lm.z * w))
-                lmlist.append([tid, cx, cy, lm.z])
+                lmlist.append([tid, cx, cy])
                 if draw:
                     cv2.putText(img, str(tid), (cx, cy), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (0, 255, 0), 2)
                     cv2.circle(img, (cx, cy), 7, (255, 0, 255), cv2.FILLED)
@@ -264,8 +261,8 @@ def main():
 
     while True:
         success, img = cap.read()
-        img = detector.findHands(img)
-        lmlist = detector.findPosition(img)
+        img = detector.find_hands(img)
+        lmlist = detector.find_position(img)
         if len(lmlist) != 0:
             detector.fingers_status(lmlist)
             # print(fingers_status)

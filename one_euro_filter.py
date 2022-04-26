@@ -1,5 +1,6 @@
 import math
-import numpy as np
+import statistics as s
+
 
 def smoothing_factor(t_e, cutoff):
     r = 2 * math.pi * cutoff * t_e
@@ -45,7 +46,6 @@ class OneEuroFilter:
         self.t_prev = t
 
         return x_hat
-import statistics as s
 
 
 class MeanFilter:
