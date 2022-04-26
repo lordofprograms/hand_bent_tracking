@@ -4,21 +4,14 @@ import numpy as np
 import HandTrackingModule as htm
 import math
 
-wCam, hCam = 640, 480
-cap = cv2.VideoCapture(0)
-pTime = 0
-
-detector = htm.HandDetector(detection_conf=0.7, track_conf=0.7)
-
-# TODO add list with 5 latest or one value, if next value is bigger or smaller for 7-10 update value
-# TODO also make this for ref_points
-
 
 class HandBentStatus:
-    def __init__(self):
+    def __init__(self, camera_num=0, detection_conf=0.7, tracking_conf=0.7):
+        self.cap = cv2.VideoCapture(camera_num)
+        self.detector = htm.HandDetector(detection_conf=detection_conf, track_conf=tracking_conf)
+
         self.minVal = 0
         self.maxVal = 100
-
         # if needed can change middle to little finger base, 9 to 17
         self.thumb_finish_fb = 9
         self.min_tip_dict = {4: 0.1, 8: 1.7, 12: 1.5, 16: 1.7, 20: 2}
@@ -30,14 +23,35 @@ class HandBentStatus:
         self.prev_percent_arr = [0.0] * vals_amount
         self.prev_ref_point = 0.0
         self.name_mappings = {0: "thumb", 1: "index", 2: "middle", 3: "ring", 4: "little"}
+        self.idx = 0
 
-    def selected_tip_demo(self, lmList, tip_id: int = 8):
-        # tip_id = 8
-        x1, y1 = lmList[tip_id][1], lmList[tip_id][2]
-        if tip_id != 4:
-            x2, y2 = lmList[tip_id - 3][1], lmList[1][2]
+    def fingers_bent_img(self, draw_landmarks: bool = True, return_step=15, frame_width=None, frame_height=None):
+        if frame_width:
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
+        if frame_height:
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
+
+        success, cv_img = self.cap.read()
+        cv_img = self.detector.find_hands(cv_img, draw=draw_landmarks)
+        lm_list = self.detector.find_position(cv_img, draw=False)
+
+        self.idx += 1
+        if len(lm_list) != 0 and (return_step == 0 or self.idx % return_step == 0):
+            fingers_stats = finger_regressor.fingers_bent_percent(lm_list)
+            # cv2.putText(img, f"{fingers_stats}", (640, 640), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 3)
+            self.idx = 1
+            fingers_stats.reverse()
+            return cv_img, fingers_stats
         else:
-            x2, y2 = lmList[self.thumb_finish_fb][1], lmList[self.thumb_finish_fb][2]
+            return cv_img, None
+
+    def selected_tip_demo(self, lm_list, tip_id: int = 8):
+        # tip_id = 8
+        x1, y1 = lm_list[tip_id][1], lm_list[tip_id][2]
+        if tip_id != 4:
+            x2, y2 = lm_list[tip_id - 3][1], lm_list[1][2]
+        else:
+            x2, y2 = lm_list[self.thumb_finish_fb][1], lm_list[self.thumb_finish_fb][2]
         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
 
         cv2.circle(img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
@@ -63,7 +77,7 @@ class HandBentStatus:
 
         # print("range min/max", rel_hand_min_range, rel_hand_max_range)
 
-        ref_point = abs(lmList[2][2] - lmList[1][2])
+        ref_point = abs(lm_list[2][2] - lm_list[1][2])
         # print(f"ref point = {ref_point}, prev ref point was {prev_ref_point}")
         # prev_ref_point = ref_point
 
@@ -78,7 +92,7 @@ class HandBentStatus:
         volBar = np.interp(length, [rel_hand_min_range, rel_hand_max_range], [400, 150])
         # volPer = np.interp(length, [rel_hand_min_range, rel_hand_max_range], [0, 100])
         volPer = vol
-        print("experiment: ", int(length), vol, lmList[tip_id][3])
+        print("experiment: ", int(length), vol, lm_list[tip_id][3])
 
         if length < 50:
             cv2.circle(img, (cx, cy), 15, (0, 255, 0), cv2.FILLED)
@@ -138,20 +152,11 @@ class HandBentStatus:
 
 if __name__ == '__main__':
     finger_regressor = HandBentStatus()
+    pTime = 0
     while True:
-        success, img = cap.read()
-        img = detector.find_hands(img, draw=True)
-        lmList = detector.find_position(img, draw=False)
-
-        i = 0
-        # if len(lmList) != 0:
-        if len(lmList) != 0 and i % 15 == 0:
-            tip_ids = [4, 8, 12, 16, 20]
-            # finger_regressor.selected_tip_demo(lmList, 4)
-            fingers_stats = finger_regressor.fingers_bent_percent(lmList)
-            print(fingers_stats)
-            cv2.putText(img, f"{fingers_stats}", (640, 640), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 3)
-            i = 1
+        img, bent_stats = finger_regressor.fingers_bent_img(return_step=0)
+        if bent_stats:
+            print(bent_stats)
 
         cTime = time.time()
         fps = 1 / (cTime - pTime)
