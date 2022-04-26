@@ -26,6 +26,15 @@ class HandBentStatus:
         self.idx = 0
 
     def fingers_bent_img(self, draw_landmarks: bool = True, return_step=15, frame_width=None, frame_height=None):
+        """
+        Calculate bent percent by hand landmarks position
+        :param draw_landmarks: show green lines that tracks and highlight hand
+        :param return_step: return all finger bent percents or skip some frames
+        :param frame_width: screen width
+        :param frame_height: screen height
+        :return: cv2 img, list of bent percents
+        """
+
         if frame_width:
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
         if frame_height:
@@ -158,6 +167,7 @@ if __name__ == '__main__':
         if bent_stats:
             print(bent_stats)
 
+        # redundant part for integration
         cTime = time.time()
         fps = 1 / (cTime - pTime)
         pTime = cTime
