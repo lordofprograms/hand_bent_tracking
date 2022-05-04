@@ -13,16 +13,17 @@ class HandBentStatus:
         self.minVal = 0
         self.maxVal = 100
         # if needed can change middle to little finger base, 9 to 17
-        self.thumb_finish_fb = 9
+        self.thumb_fb = 17
+        self.thumb_drive_fb = 9
         self.min_tip_dict = {4: 0.1, 8: 1.7, 12: 1.5, 16: 1.7, 20: 2}
         self.max_tip_dict = {4: 4}
 
         # TODO move to class for normal usage of heuristic for checking diff and make less updates
-        vals_amount = 5
+        vals_amount = 6
         self.prev_len_arr = [0.0] * vals_amount
         self.prev_percent_arr = [0.0] * vals_amount
         self.prev_ref_point = 0.0
-        self.name_mappings = {0: "thumb", 1: "index", 2: "middle", 3: "ring", 4: "little"}
+        self.name_mappings = {0: "thumb drive", 1: "thumb", 2: "index", 3: "middle", 4: "ring", 5: "little"}
         self.idx = 0
 
     def fingers_bent_img(self, draw_landmarks: bool = True, return_step=15, frame_width=None, frame_height=None):
@@ -126,15 +127,17 @@ class HandBentStatus:
         else:
             ref_point = self.prev_ref_point
 
-        fingers_percent = [0]
-        tip_id_list = [4, 8, 12, 16, 20]
+        fingers_percent = []
+        tip_id_list = [-4, 4, 8, 12, 16, 20]
         for i, tip_id in enumerate(tip_id_list):
-            x1, y1 = lm_list[tip_id][1], lm_list[tip_id][2]
+            x1, y1 = lm_list[abs(tip_id)][1], lm_list[abs(tip_id)][2]
 
-            if tip_id != 4:
+            if abs(tip_id) != 4:
                 x2, y2 = lm_list[tip_id - 3][1], lm_list[1][2]
             else:
-                x2, y2 = lm_list[self.thumb_finish_fb][1], lm_list[self.thumb_finish_fb][2]
+                thumb_val = self.thumb_drive_fb if tip_id == -4 else self.thumb_fb
+                x2, y2 = lm_list[thumb_val][1], lm_list[thumb_val][2]
+                tip_id = abs(tip_id)
 
             length = math.hypot(x2 - x1, y2 - y1)
             # print(f"length = {length}, prev len was {self.prev_len_arr[i]}, diff = {length - self.prev_len_arr[i]}")
